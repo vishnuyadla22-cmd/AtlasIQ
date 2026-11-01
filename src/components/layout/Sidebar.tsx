@@ -205,15 +205,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
               <span>Platform Version</span>
-              <span className="text-brand-600 font-mono">v0.1-p1</span>
+              <span className="text-brand-600 font-mono">v0.2-p2</span>
             </div>
             <div className="text-[10px] text-slate-500 leading-tight">
-              FORGE Hackathon · Phase 1
+              AtlasIQ Geospatial Intelligence · Phase 2
             </div>
           </div>
         ) : (
-          <div className="flex justify-center text-[10px] text-slate-500 font-mono" title="Phase 1">
-            P1
+          <div className="flex justify-center text-[10px] text-slate-500 font-mono" title="Phase 2">
+            P2
           </div>
         )}
       </div>

@@ -8,12 +8,15 @@ AtlasIQ aggregates multi-sector planetary indicators—from climate resilience a
 
 ## 🧭 Project Roadmap
 
-- **Phase 1: Project Foundation, Premium UI & Frontend Stability** *(Current Phase)*
-  - Establish Vite + React + TypeScript + Tailwind CSS application shell.
-  - Implement full responsive sidebar navigation and unified page layouts.
-  - Deliver Overview, Location Explorer, 9 Domain Modules, Comparative, Scenario, and Assistant views with honest empty states and data transparency standards.
-- **Phase 2: Geocoding & Interactive Geospatial Mapping** *(Prompt 2)*
-  - Integrate Leaflet / React-Leaflet interactive map, Nominatim geocoding, and Open-Meteo live weather & climate telemetry.
+- **Phase 1: Project Foundation, Premium UI & Frontend Stability** *(Completed)*
+  - Established Vite + React + TypeScript + Tailwind CSS application shell.
+  - Implemented full responsive sidebar navigation and unified page layouts.
+  - Delivered Overview, Location Explorer, 9 Domain Modules, Comparative, Scenario, and Assistant views with honest empty states and data transparency standards.
+- **Phase 2: Geocoding & Interactive Geospatial Mapping** *(Current Phase - Completed)*
+  - Integrated Leaflet / React-Leaflet interactive map with custom AtlasIQ pins and coordinate popups.
+  - OpenStreetMap Nominatim geocoding engine with client-side caching and Open-Meteo geocoding fallback.
+  - Real-time Open-Meteo weather integration: current surface conditions (temp, feels like, humidity, precipitation, wind) and 5-day numerical model forecasts.
+  - Fixed core sector indicator card crowding and clarified multi-tier location resolution states.
 - **Phase 3: Multi-Location Comparison & Normalized Benchmarking** *(Prompt 3)*
   - Side-by-side indicator deltas, radar charts, and comparative percentile distributions.
 - **Phase 4: Grounded AI Location Assistant** *(Prompt 4)*
@@ -30,6 +33,9 @@ AtlasIQ aggregates multi-sector planetary indicators—from climate resilience a
 - **Framework:** React 18 with TypeScript
 - **Build Tool:** Vite 5
 - **Styling:** Tailwind CSS 3.4
+- **Maps:** Leaflet v1.9 & React Leaflet v4 with OpenStreetMap Tiles
+- **Geocoding:** OSM Nominatim & Open-Meteo Geocoding
+- **Weather Telemetry:** Open-Meteo API
 - **Icons:** Lucide React
 - **Routing:** React Router v6
 - **Charts:** Recharts (visualization foundation)

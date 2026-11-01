@@ -19,7 +19,6 @@ import {
 import { SearchInput } from '../components/common/SearchInput';
 import { CategoryCard } from '../components/common/CategoryCard';
 import { Card } from '../components/common/Card';
-import { Badge } from '../components/common/Badge';
 import { DataTransparencyBanner } from '../components/common/DataTransparencyBanner';
 import { INTELLIGENCE_MODULES } from '../data/modules';
 
@@ -53,8 +52,8 @@ export const OverviewPage: React.FC = () => {
     <div className="space-y-10 pb-12">
       {/* Hero Section */}
       <section className="text-center max-w-3xl mx-auto pt-4 sm:pt-8 space-y-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 border border-brand-200/80 text-brand-700 text-xs font-semibold tracking-wide">
-          <Badge variant="brand" size="sm">FORGE Hackathon</Badge>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-brand-50 border border-brand-200/80 text-brand-700 text-xs font-semibold tracking-wide">
+          <span className="w-1.5 h-1.5 rounded-full bg-brand-600"></span>
           <span>AI Location Intelligence Platform</span>
         </div>
 

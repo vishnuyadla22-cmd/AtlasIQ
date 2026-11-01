@@ -1,26 +1,35 @@
-import React, { useState } from 'react';
-import { Search, MapPin, X, ArrowRight, Info } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, MapPin, X, ArrowRight, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface SearchInputProps {
   placeholder?: string;
   size?: 'md' | 'lg';
   autoNavigate?: boolean;
+  onSearch?: (query: string) => void;
+  isLoading?: boolean;
   className?: string;
   initialValue?: string;
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({
-  placeholder = 'Enter a city, region, coordinates, or country (e.g., Nairobi, Kenya)...',
+  placeholder = 'Enter a city, region, or country (e.g., Hyderabad, India)...',
   size = 'lg',
   autoNavigate = true,
+  onSearch,
+  isLoading = false,
   className = '',
   initialValue = '',
 }) => {
   const [query, setQuery] = useState(initialValue);
   const [error, setError] = useState<string | null>(null);
-  const [showDemoNotice, setShowDemoNotice] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (initialValue) {
+      setQuery(initialValue);
+    }
+  }, [initialValue]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,10 +46,12 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     }
 
     setError(null);
-    setShowDemoNotice(true);
+
+    if (onSearch) {
+      onSearch(trimmed);
+    }
 
     if (autoNavigate) {
-      // Navigate to /explorer with query param
       navigate(`/explorer?q=${encodeURIComponent(trimmed)}`);
     }
   };
@@ -48,7 +59,6 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   const handleClear = () => {
     setQuery('');
     setError(null);
-    setShowDemoNotice(false);
   };
 
   const isLarge = size === 'lg';
@@ -76,17 +86,18 @@ export const SearchInput: React.FC<SearchInputProps> = ({
             }}
             placeholder={placeholder}
             aria-label="Location search"
-            className={`w-full bg-transparent text-slate-800 placeholder-slate-400 focus:outline-none ${
+            disabled={isLoading}
+            className={`w-full bg-transparent text-slate-800 placeholder-slate-400 focus:outline-none disabled:opacity-60 ${
               isLarge ? 'py-3.5 text-sm sm:text-base' : 'py-2.5 text-sm'
             }`}
           />
 
-          {query && (
+          {query && !isLoading && (
             <button
               type="button"
               onClick={handleClear}
               aria-label="Clear location search"
-              className="p-1.5 mr-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100"
+              className="p-1.5 mr-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -95,12 +106,22 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           <div className="pr-2">
             <button
               type="submit"
-              className={`flex items-center gap-1.5 font-medium rounded-lg text-white bg-brand-600 hover:bg-brand-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 shrink-0 ${
+              disabled={isLoading}
+              className={`flex items-center gap-1.5 font-medium rounded-lg text-white bg-brand-600 hover:bg-brand-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 shrink-0 disabled:opacity-75 ${
                 isLarge ? 'px-4 py-2 text-sm' : 'px-3 py-1.5 text-xs'
               }`}
             >
-              <span>Explore</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Searching...</span>
+                </>
+              ) : (
+                <>
+                  <span>Explore</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -114,23 +135,11 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-[11px] text-slate-500">
           <div className="flex items-center gap-1.5">
             <MapPin className="w-3 h-3 text-slate-400" />
-            <span>Example queries: <span className="font-mono text-slate-700">Nairobi, Kenya</span> · <span className="font-mono text-slate-700">Valencia, Spain</span> · <span className="font-mono text-slate-700">Kyoto, Japan</span></span>
+            <span>Example queries: <span className="font-mono text-slate-700">Hyderabad, India</span> · <span className="font-mono text-slate-700">Valencia, Spain</span> · <span className="font-mono text-slate-700">Nairobi, Kenya</span></span>
           </div>
-          <span className="text-slate-400 italic">Phase 1 UI flow · Geocoding engine arrives in Prompt 2</span>
+          <span className="text-slate-400">Powered by OSM Nominatim & Open-Meteo</span>
         </div>
       </form>
-
-      {showDemoNotice && (
-        <div className="mt-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200/80 text-amber-900 text-xs flex items-start gap-2 animate-fadeIn">
-          <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <div className="leading-snug">
-            <span className="font-semibold">Demonstration interaction: </span>
-            <span>
-              Query recorded. Production Open-Meteo & reverse geocoding integrations connect in Prompt 2.
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

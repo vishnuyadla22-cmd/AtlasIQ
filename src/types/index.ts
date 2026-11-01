@@ -9,7 +9,21 @@ export type ModuleId =
   | 'healthcare-education'
   | 'infrastructure';
 
-export type DataStatus = 'measured' | 'estimated' | 'simulation' | 'unavailable';
+export type DataStatus =
+  | 'measured'
+  | 'forecast'
+  | 'estimated'
+  | 'simulation'
+  | 'unavailable'
+  | 'awaiting_geocoding'
+  | 'geocoding';
+
+export type LocationResolutionState =
+  | 'idle'
+  | 'query_entered'
+  | 'resolving'
+  | 'resolved'
+  | 'error';
 
 export interface LocationItem {
   id: string;
@@ -21,6 +35,56 @@ export interface LocationItem {
     lng: number;
   };
   description?: string;
+}
+
+export interface GeocodeResult {
+  placeId: number;
+  displayName: string;
+  name: string;
+  lat: number;
+  lng: number;
+  type: string;
+  importance: number;
+  country?: string;
+  state?: string;
+  city?: string;
+  boundingBox?: [number, number, number, number];
+}
+
+export interface WeatherCurrent {
+  time: string;
+  temperature: number;
+  apparentTemperature: number;
+  relativeHumidity: number;
+  precipitation: number;
+  weatherCode: number;
+  weatherText: string;
+  windSpeed: number;
+  windDirection: number;
+  isDay: boolean;
+}
+
+export interface WeatherForecastDay {
+  date: string;
+  weatherCode: number;
+  weatherText: string;
+  tempMax: number;
+  tempMin: number;
+  precipitationSum: number;
+  precipitationProbabilityMax?: number;
+  windSpeedMax: number;
+}
+
+export interface WeatherData {
+  latitude: number;
+  longitude: number;
+  elevation: number;
+  timezone: string;
+  current: WeatherCurrent;
+  daily: WeatherForecastDay[];
+  provider: string;
+  retrievedAt: string;
+  dataTier: DataStatus;
 }
 
 export interface IntelligenceModuleMeta {
