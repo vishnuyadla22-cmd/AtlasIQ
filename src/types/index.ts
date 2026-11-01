@@ -9,9 +9,24 @@ export type ModuleId =
   | 'healthcare-education'
   | 'infrastructure';
 
-export type DataStatus =
-  | 'measured'
+export type DataClassification =
+  | 'observation'
+  | 'provider_reported_current'
+  | 'model_analysis'
   | 'forecast'
+  | 'historical_baseline'
+  | 'estimate'
+  | 'simulation'
+  | 'unavailable';
+
+export type DataStatus =
+  | 'observation'
+  | 'measured'
+  | 'provider_reported_current'
+  | 'model_analysis'
+  | 'forecast'
+  | 'historical_baseline'
+  | 'estimate'
   | 'estimated'
   | 'simulation'
   | 'unavailable'
@@ -48,6 +63,7 @@ export interface GeocodeResult {
   country?: string;
   state?: string;
   city?: string;
+  countryCode?: string;
   boundingBox?: [number, number, number, number];
 }
 
@@ -62,6 +78,9 @@ export interface WeatherCurrent {
   windSpeed: number;
   windDirection: number;
   isDay: boolean;
+  surfacePressure?: number;
+  directNormalIrradiance?: number;
+  globalTiltedIrradiance?: number;
 }
 
 export interface WeatherForecastDay {
@@ -73,6 +92,8 @@ export interface WeatherForecastDay {
   precipitationSum: number;
   precipitationProbabilityMax?: number;
   windSpeedMax: number;
+  shortwaveRadiationSum?: number;
+  et0Evapotranspiration?: number;
 }
 
 export interface WeatherData {
@@ -84,7 +105,116 @@ export interface WeatherData {
   daily: WeatherForecastDay[];
   provider: string;
   retrievedAt: string;
-  dataTier: DataStatus;
+  dataTier: DataClassification;
+  dataSourceNotes: string;
+}
+
+export interface AirQualityCurrent {
+  time: string;
+  europeanAqi?: number;
+  usAqi?: number;
+  pm2_5?: number;
+  pm10?: number;
+  nitrogenDioxide?: number;
+  ozone?: number;
+}
+
+export interface AirQualityData {
+  latitude: number;
+  longitude: number;
+  current: AirQualityCurrent;
+  provider: string;
+  retrievedAt: string;
+  dataTier: DataClassification;
+  dataSourceNotes: string;
+}
+
+export interface DomainMetric {
+  id: string;
+  name: string;
+  category: ModuleId;
+  value: number | string | null;
+  unit: string;
+  classification: DataClassification;
+  source: string;
+  coverage?: string;
+  retrievedAt?: string;
+  observationTime?: string;
+  qualityNotes?: string;
+  unavailableReason?: string;
+  geographicScope?: string;
+}
+
+export interface HydrologyData {
+  latitude: number;
+  longitude: number;
+  riverDischarge?: number; // m³/s (GloFAS model)
+  soilMoisture0to7cm?: number; // m³/m³
+  soilMoisture7to28cm?: number; // m³/m³
+  soilMoisture28to100cm?: number; // m³/m³
+  time?: string;
+  provider: string;
+  dataTier: DataClassification;
+  dataSourceNotes: string;
+  retrievedAt: string;
+}
+
+export interface WorldBankIndicatorValue {
+  value: number | null;
+  year: string;
+  indicatorId: string;
+  indicatorName: string;
+}
+
+export interface WorldBankCountryData {
+  countryCode: string;
+  countryName: string;
+  gdpPerCapita?: WorldBankIndicatorValue;
+  inflationRate?: WorldBankIndicatorValue;
+  totalPopulation?: WorldBankIndicatorValue;
+  urbanPopulationPercent?: WorldBankIndicatorValue;
+  hospitalBeds?: WorldBankIndicatorValue;
+  lifeExpectancy?: WorldBankIndicatorValue;
+  electricityAccess?: WorldBankIndicatorValue;
+  internetUsersPercent?: WorldBankIndicatorValue;
+  physiciansPer1000?: WorldBankIndicatorValue;
+  healthExpenditurePctGdp?: WorldBankIndicatorValue;
+  renewableEnergyShare?: WorldBankIndicatorValue;
+  laborForceParticipation?: WorldBankIndicatorValue;
+  logisticsPerformanceIndex?: WorldBankIndicatorValue;
+  fixedBroadband?: WorldBankIndicatorValue;
+  retrievedAt: string;
+  source: string;
+}
+
+export interface SeismicEvent {
+  id: string;
+  magnitude: number;
+  place: string;
+  time: string;
+  distanceKm?: number;
+}
+
+export interface SeismicData {
+  latitude: number;
+  longitude: number;
+  recentEventCount: number;
+  maxMagnitude?: number;
+  nearestEvent?: SeismicEvent;
+  events?: SeismicEvent[];
+  retrievedAt: string;
+  provider: string;
+  dataTier: DataClassification;
+  dataSourceNotes: string;
+}
+
+export interface DomainIntelligence {
+  domainId: ModuleId;
+  domainTitle: string;
+  status: 'available' | 'partial' | 'unavailable';
+  metrics: DomainMetric[];
+  summary?: string;
+  limitations: string;
 }
 
 export interface IntelligenceModuleMeta {
@@ -108,9 +238,17 @@ export interface IntelligenceModuleMeta {
 
 export interface MetricCardProps {
   label: string;
-  value: string | number;
+  value?: string | number | null;
   unit?: string;
   status?: DataStatus;
+  statusLabel?: string;
+  description?: string;
+  subtext?: string;
+  source?: string;
+  timestamp?: string;
+  geographicScope?: string;
+  icon?: React.ReactNode;
+  className?: string;
   change?: string;
   trend?: 'up' | 'down' | 'neutral';
   tooltip?: string;
@@ -123,6 +261,15 @@ export interface AIMessage {
   timestamp: string;
   sources?: string[];
   isNotice?: boolean;
+  supportingData?: {
+    metric: string;
+    value: string | number;
+    unit: string;
+    source: string;
+    tier: DataClassification;
+  }[];
+  limitations?: string;
+  targetLocationName?: string;
 }
 
 export interface ScenarioParameter {

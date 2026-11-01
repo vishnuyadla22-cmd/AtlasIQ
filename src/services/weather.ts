@@ -70,6 +70,9 @@ interface OpenMeteoRawResponse {
     wind_speed_10m: number;
     wind_direction_10m: number;
     is_day: number;
+    surface_pressure?: number;
+    direct_normal_irradiance?: number;
+    global_tilted_irradiance?: number;
   };
   daily?: {
     time: string[];
@@ -79,6 +82,8 @@ interface OpenMeteoRawResponse {
     precipitation_sum: number[];
     precipitation_probability_max?: number[];
     wind_speed_10m_max: number[];
+    shortwave_radiation_sum?: number[];
+    et0_fao_evapotranspiration?: number[];
   };
 }
 
@@ -108,11 +113,11 @@ export async function fetchWeatherData(
     url.searchParams.set('longitude', longitude.toFixed(4));
     url.searchParams.set(
       'current',
-      'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,is_day'
+      'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,is_day,surface_pressure,direct_normal_irradiance,global_tilted_irradiance'
     );
     url.searchParams.set(
       'daily',
-      'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max'
+      'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,shortwave_radiation_sum,et0_fao_evapotranspiration'
     );
     url.searchParams.set('timezone', 'auto');
     url.searchParams.set('forecast_days', '5');
@@ -137,7 +142,7 @@ export async function fetchWeatherData(
     if (!json.current) {
       return {
         data: null,
-        error: 'Telemetry missing current conditions payload.',
+        error: 'Service returned payload missing current conditions.',
       };
     }
 
@@ -153,6 +158,8 @@ export async function fetchWeatherData(
           precipitationSum: json.daily.precipitation_sum[i] ?? 0,
           precipitationProbabilityMax: json.daily.precipitation_probability_max?.[i],
           windSpeedMax: json.daily.wind_speed_10m_max[i] ?? 0,
+          shortwaveRadiationSum: json.daily.shortwave_radiation_sum?.[i],
+          et0Evapotranspiration: json.daily.et0_fao_evapotranspiration?.[i],
         });
       }
     }
@@ -173,11 +180,15 @@ export async function fetchWeatherData(
         windSpeed: json.current.wind_speed_10m,
         windDirection: json.current.wind_direction_10m,
         isDay: json.current.is_day === 1,
+        surfacePressure: json.current.surface_pressure,
+        directNormalIrradiance: json.current.direct_normal_irradiance,
+        globalTiltedIrradiance: json.current.global_tilted_irradiance,
       },
       daily: dailyForecasts,
-      provider: 'Open-Meteo API',
+      provider: 'Open-Meteo Weather API',
       retrievedAt: new Date().toISOString(),
-      dataTier: 'measured',
+      dataTier: 'model_analysis',
+      dataSourceNotes: 'Numerical weather prediction (NWP) model outputs (ECMWF IFS, DWD ICON, NOAA GFS blended analysis). Not direct ground-station telemetry.',
     };
 
     weatherCache.set(cacheKey, { data: weatherData, timestamp: Date.now() });
@@ -190,7 +201,7 @@ export async function fetchWeatherData(
     const message = err instanceof Error ? err.message : 'Weather service connection failed';
     return {
       data: null,
-      error: `Open-Meteo telemetry error: ${message}`,
+      error: `Weather provider error: ${message}`,
     };
   }
 }

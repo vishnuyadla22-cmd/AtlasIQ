@@ -85,7 +85,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
           <span className="text-xs font-medium text-slate-600 hidden sm:inline">Engine Standby</span>
           <span className="text-[11px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
-            Phase 1
+            Phase 4
           </span>
         </div>
       </div>

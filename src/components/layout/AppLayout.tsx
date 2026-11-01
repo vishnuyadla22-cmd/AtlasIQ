@@ -19,21 +19,21 @@ export const AppLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800 antialiased selection:bg-brand-100 selection:text-brand-900">
+    <div className="h-screen bg-slate-50 flex flex-col font-sans text-slate-800 antialiased selection:bg-brand-100 selection:text-brand-900 overflow-hidden">
       {/* Mobile Drawer */}
       <MobileNav isOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Desktop Sidebar */}
-        <div className="hidden lg:block shrink-0">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* Desktop Sidebar: stays stationary, inner navigation scrolls independently */}
+        <aside className="hidden lg:flex flex-col shrink-0 h-full">
           <Sidebar
             isCollapsed={isCollapsed}
             onToggleCollapse={toggleSidebar}
           />
-        </div>
+        </aside>
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        {/* Main Content Area: independently scrollable */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto">
           <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
           
           <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">

@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { LocationProvider } from './context/LocationContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { OverviewPage } from './pages/OverviewPage';
 import { LocationExplorerPage } from './pages/LocationExplorerPage';
@@ -22,39 +23,41 @@ import { NotFoundPage } from './pages/NotFoundPage';
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<AppLayout />}>
-          <Route index element={<OverviewPage />} />
-          <Route path="explorer" element={<LocationExplorerPage />} />
-          
-          {/* Intelligence Modules */}
-          <Route path="intelligence">
-            <Route path="climate" element={<ClimateWeatherPage />} />
-            <Route path="agriculture" element={<AgriculturePage />} />
-            <Route path="water" element={<WaterResourcesPage />} />
-            <Route path="energy" element={<EnergyPage />} />
-            <Route path="environment" element={<EnvironmentPage />} />
-            <Route path="natural-resources" element={<NaturalResourcesPage />} />
-            <Route path="economy" element={<LivingCostEconomyPage />} />
-            <Route path="healthcare-education" element={<HealthcareEducationPage />} />
-            <Route path="infrastructure" element={<InfrastructurePage />} />
-            <Route path=":moduleId" element={<IntelligenceModuleView />} />
+      <LocationProvider>
+        <Routes>
+          <Route path="/" element={<AppLayout />}>
+            <Route index element={<OverviewPage />} />
+            <Route path="explorer" element={<LocationExplorerPage />} />
+
+            {/* Intelligence Modules */}
+            <Route path="intelligence">
+              <Route path="climate" element={<ClimateWeatherPage />} />
+              <Route path="agriculture" element={<AgriculturePage />} />
+              <Route path="water" element={<WaterResourcesPage />} />
+              <Route path="energy" element={<EnergyPage />} />
+              <Route path="environment" element={<EnvironmentPage />} />
+              <Route path="natural-resources" element={<NaturalResourcesPage />} />
+              <Route path="economy" element={<LivingCostEconomyPage />} />
+              <Route path="healthcare-education" element={<HealthcareEducationPage />} />
+              <Route path="infrastructure" element={<InfrastructurePage />} />
+              <Route path=":moduleId" element={<IntelligenceModuleView />} />
+            </Route>
+
+            {/* Analysis Modules */}
+            <Route path="analysis">
+              <Route path="resource-gap" element={<ResourceGapAnalysisPage />} />
+              <Route path="compare" element={<CompareLocationsPage />} />
+              <Route path="simulator" element={<ScenarioSimulatorPage />} />
+            </Route>
+
+            {/* AI Assistant */}
+            <Route path="assistant" element={<AIAssistantPage />} />
+
+            {/* Catch-all 404 */}
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
-
-          {/* Analysis Modules */}
-          <Route path="analysis">
-            <Route path="resource-gap" element={<ResourceGapAnalysisPage />} />
-            <Route path="compare" element={<CompareLocationsPage />} />
-            <Route path="simulator" element={<ScenarioSimulatorPage />} />
-          </Route>
-
-          {/* AI Assistant */}
-          <Route path="assistant" element={<AIAssistantPage />} />
-
-          {/* Catch-all 404 */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
-      </Routes>
+        </Routes>
+      </LocationProvider>
     </BrowserRouter>
   );
 };

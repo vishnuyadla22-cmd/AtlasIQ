@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   MapPin,
@@ -16,6 +16,8 @@ import {
   Compass,
   CheckCircle2,
   AlertCircle,
+  Activity,
+  FileText,
 } from 'lucide-react';
 import { SearchInput } from '../components/common/SearchInput';
 import { Card } from '../components/common/Card';
@@ -24,52 +26,51 @@ import { EmptyState } from '../components/common/EmptyState';
 import { StatusPill } from '../components/common/StatusPill';
 import { Badge } from '../components/common/Badge';
 import { LocationMap } from '../components/map/LocationMap';
-import { searchLocations } from '../services/geocoding';
-import { fetchWeatherData } from '../services/weather';
-import { GeocodeResult, WeatherData, LocationResolutionState } from '../types';
+import { buildDomainIntelligence } from '../services/domains';
+import { GeocodeResult } from '../types';
+import { useLocationContext } from '../context/LocationContext';
 
 export const LocationExplorerPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialQuery = searchParams.get('q') || '';
+  const queryParam = searchParams.get('q') || '';
 
-  const [currentQuery, setCurrentQuery] = useState(initialQuery);
-  const [resolutionState, setResolutionState] = useState<LocationResolutionState>(
-    initialQuery ? 'query_entered' : 'idle'
-  );
+  const {
+    activeLocation,
+    resolutionState,
+    weatherData,
+    airQualityData,
+    worldBankData,
+    hydrologyData,
+    seismicData,
+    isLoadingTelemetry,
+    telemetryError,
+    searchQuery,
+    isGeocoding,
+    geocodeError,
+    candidates,
+    searchLocation,
+    selectCandidate,
+  } = useLocationContext();
 
-  const [candidates, setCandidates] = useState<GeocodeResult[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<GeocodeResult | null>(null);
-  const [geocodeError, setGeocodeError] = useState<string | null>(null);
-  const [isGeocoding, setIsGeocoding] = useState(false);
+  // Selected location aliases to activeLocation from context
+  const selectedLocation = activeLocation;
+  const isWeatherLoading = isLoadingTelemetry;
+  const isAqLoading = isLoadingTelemetry;
+  const weatherError = telemetryError;
 
-  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
-  const [weatherError, setWeatherError] = useState<string | null>(null);
-  const [isWeatherLoading, setIsWeatherLoading] = useState(false);
+  const [currentQuery, setCurrentQuery] = useState(queryParam || searchQuery || '');
 
-  // AbortController refs to cancel pending fetches on unmount or new search
-  const geocodeAbortRef = useRef<AbortController | null>(null);
-  const weatherAbortRef = useRef<AbortController | null>(null);
-
-  // Fetch weather data for resolved coordinates
-  const loadWeather = useCallback(async (lat: number, lng: number) => {
-    weatherAbortRef.current?.abort();
-    const controller = new AbortController();
-    weatherAbortRef.current = controller;
-
-    setIsWeatherLoading(true);
-    setWeatherError(null);
-
-    const { data, error } = await fetchWeatherData(lat, lng, controller.signal);
-
-    setIsWeatherLoading(false);
-    if (error) {
-      setWeatherError(error);
-    } else {
-      setWeatherData(data);
+  // Synchronize input text with active location or query param
+  useEffect(() => {
+    if (activeLocation) {
+      setCurrentQuery(activeLocation.name);
+      if (searchParams.get('q') !== activeLocation.name) {
+        setSearchParams({ q: activeLocation.name }, { replace: true });
+      }
     }
-  }, []);
+  }, [activeLocation, setSearchParams]);
 
-  // Main geocode search handler
+  // Main geocode search handler calling shared context
   const executeSearch = useCallback(
     async (queryText: string) => {
       const trimmed = queryText.trim();
@@ -77,56 +78,24 @@ export const LocationExplorerPage: React.FC = () => {
 
       setCurrentQuery(trimmed);
       setSearchParams({ q: trimmed });
-      setGeocodeError(null);
-      setResolutionState('resolving');
-      setIsGeocoding(true);
-      setCandidates([]);
-      setWeatherData(null);
-
-      geocodeAbortRef.current?.abort();
-      const controller = new AbortController();
-      geocodeAbortRef.current = controller;
-
-      const { data, error } = await searchLocations(trimmed, controller.signal);
-
-      setIsGeocoding(false);
-
-      if (error) {
-        setGeocodeError(error);
-        setResolutionState('error');
-        setSelectedLocation(null);
-      } else if (data.length === 0) {
-        setGeocodeError(`No geographic coordinates found for "${trimmed}".`);
-        setResolutionState('error');
-        setSelectedLocation(null);
-      } else {
-        setCandidates(data);
-        const primary = data[0];
-        setSelectedLocation(primary);
-        setResolutionState('resolved');
-        // Retrieve weather telemetry for resolved coordinates
-        loadWeather(primary.lat, primary.lng);
-      }
+      await searchLocation(trimmed);
     },
-    [loadWeather, setSearchParams]
+    [searchLocation, setSearchParams]
   );
 
   // When user clicks a candidate from multiple matches
   const handleSelectCandidate = (candidate: GeocodeResult) => {
-    setSelectedLocation(candidate);
-    loadWeather(candidate.lat, candidate.lng);
+    selectCandidate(candidate);
+    setCurrentQuery(candidate.name);
+    setSearchParams({ q: candidate.name });
   };
 
-  // Run search on mount if URL contains ?q=
+  // Run search on mount if URL contains ?q= and differs from currently active location
   useEffect(() => {
-    if (initialQuery) {
-      executeSearch(initialQuery);
+    if (queryParam && (!activeLocation || activeLocation.name.toLowerCase() !== queryParam.toLowerCase())) {
+      executeSearch(queryParam);
     }
-    return () => {
-      geocodeAbortRef.current?.abort();
-      weatherAbortRef.current?.abort();
-    };
-  }, []); // Run once on mount
+  }, [queryParam]);
 
   // Format observation timestamp
   const formatTime = (timeStr?: string) => {
@@ -139,6 +108,21 @@ export const LocationExplorerPage: React.FC = () => {
     }
   };
 
+  // Build uniform 9-domain intelligence model
+  const domainIntelligence = buildDomainIntelligence(
+    selectedLocation,
+    weatherData,
+    airQualityData,
+    worldBankData,
+    hydrologyData,
+    seismicData
+  );
+
+  // Derive factual summary string for the location
+  const factualSummary = selectedLocation && weatherData
+    ? `For ${selectedLocation.name} (${selectedLocation.country || ''}), Open-Meteo reports current weather conditions of ${weatherData.current.weatherText} at ${weatherData.current.temperature.toFixed(1)}°C (feels like ${weatherData.current.apparentTemperature.toFixed(1)}°C) with ${weatherData.current.relativeHumidity}% humidity and ${weatherData.current.windSpeed.toFixed(1)} km/h wind.${airQualityData?.current.usAqi !== undefined ? ` Ambient air quality is indexed at ${airQualityData.current.usAqi} US AQI (PM2.5: ${airQualityData.current.pm2_5?.toFixed(1) || '—'} µg/m³).` : ''}`
+    : null;
+
   return (
     <div className="space-y-6">
       {/* Search Header Banner */}
@@ -150,7 +134,7 @@ export const LocationExplorerPage: React.FC = () => {
               <span>Location Explorer</span>
             </h1>
             <p className="text-xs text-slate-600 mt-0.5">
-              Live geographic boundary resolution, interactive spatial map, and multi-source planetary intelligence.
+              Live geographic boundary resolution, interactive spatial map, and multi-sector planetary intelligence.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -204,7 +188,7 @@ export const LocationExplorerPage: React.FC = () => {
                   >
                     <span className="font-semibold">{cand.name}</span>
                     <span className="text-slate-500 text-[11px] ml-1">
-                      ({cand.country || cand.state || `${cand.lat.toFixed(2)}°, ${cand.lng.toFixed(2)}°`})
+                      ({[cand.state, cand.country].filter(Boolean).join(', ') || `${cand.lat.toFixed(2)}°, ${cand.lng.toFixed(2)}°`})
                     </span>
                   </button>
                 );
@@ -238,7 +222,7 @@ export const LocationExplorerPage: React.FC = () => {
 
           <LocationMap
             selectedLocation={selectedLocation}
-            isLoading={isGeocoding || isWeatherLoading}
+            isLoading={isGeocoding || isWeatherLoading || isAqLoading}
             error={null}
             height="460px"
           />
@@ -250,7 +234,7 @@ export const LocationExplorerPage: React.FC = () => {
             <span>Location Profile & Geodetics</span>
             {selectedLocation && (
               <span className="text-[10px] text-emerald-700 font-medium flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Coordinates Resolved
               </span>
             )}
           </div>
@@ -322,29 +306,56 @@ export const LocationExplorerPage: React.FC = () => {
                 <span>Geodetic Provenance</span>
               </div>
               <p className="leading-snug">
-                Coordinates resolved via OpenStreetMap Nominatim. Weather telemetry delivered by Open-Meteo.
+                Coordinates resolved via OpenStreetMap Nominatim. Atmospheric conditions provided by Open-Meteo numerical prediction models.
               </p>
             </div>
           </Card>
         </div>
       </div>
 
-      {/* Live Weather Intelligence Panel (Displayed when coordinates are resolved) */}
+      {/* Factual Intelligence Summary (Rendered when telemetry is loaded) */}
+      {factualSummary && (
+        <Card variant="subtle" className="border-brand-200/60 bg-brand-50/20">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-brand-100/70 text-brand-700 shrink-0 mt-0.5">
+              <FileText className="w-4 h-4" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-brand-900">
+                  Location Intelligence Summary
+                </h3>
+                <span className="text-[10px] font-mono bg-white px-2 py-0.5 rounded border border-brand-200 text-brand-700">
+                  Deterministic Baseline
+                </span>
+              </div>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                {factualSummary}
+              </p>
+              <div className="text-[10px] text-slate-500 pt-1">
+                Note: Ground sensor measurements have not been established; atmospheric figures represent NWP model analysis (blended DWD ICON / ECMWF IFS). Unintegrated sector domains (water stress, sub-national GDP, infrastructure density) remain unpopulated.
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Current Weather Conditions & Short-Term Forecast Panel */}
       {selectedLocation && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                 <CloudSun className="w-4 h-4 text-brand-600" />
-                <span>Live Weather Intelligence</span>
+                <span>Current Weather Conditions</span>
               </h2>
               <p className="text-xs text-slate-500">
-                Empirical observational telemetry and short-term numerical forecast.
+                Model-analyzed atmospheric state and 5-day numerical weather forecast via Open-Meteo.
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="teal" size="sm">Open-Meteo Integration</Badge>
-              <StatusPill status="measured" customLabel="Live Telemetry" />
+              <Badge variant="teal" size="sm">Open-Meteo Model</Badge>
+              <StatusPill status="provider_reported_current" customLabel="Reported Conditions" />
             </div>
           </div>
 
@@ -356,27 +367,27 @@ export const LocationExplorerPage: React.FC = () => {
           ) : isWeatherLoading ? (
             <Card className="py-8 text-center space-y-2">
               <div className="w-6 h-6 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin mx-auto"></div>
-              <p className="text-xs text-slate-500">Querying Open-Meteo meteorological endpoints...</p>
+              <p className="text-xs text-slate-500">Retrieving Open-Meteo meteorological models...</p>
             </Card>
           ) : weatherData ? (
             <div className="space-y-4">
-              {/* Current Weather Banner Card */}
+              {/* Current Weather Conditions Banner Card */}
               <Card className="bg-gradient-to-r from-white via-slate-50 to-brand-50/30 border-slate-200/90">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 items-center">
                   {/* Primary Temp & Condition */}
-                  <div className="col-span-2 space-y-1">
+                  <div className="col-span-2 sm:col-span-3 lg:col-span-2 space-y-1">
                     <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">
-                      Current Surface Conditions
+                      Reported Surface Temperature
                     </span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+                    <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
+                      <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight whitespace-nowrap">
                         {weatherData.current.temperature.toFixed(1)}°C
                       </span>
-                      <span className="text-xs text-slate-500 font-medium">
+                      <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
                         (Feels like {weatherData.current.apparentTemperature.toFixed(1)}°C)
                       </span>
                     </div>
-                    <div className="text-xs font-semibold text-brand-700 flex items-center gap-1">
+                    <div className="text-xs font-semibold text-brand-700 flex items-center gap-1 flex-wrap">
                       <span>{weatherData.current.weatherText}</span>
                       <span>·</span>
                       <span className="font-normal text-slate-500">
@@ -388,10 +399,10 @@ export const LocationExplorerPage: React.FC = () => {
                   {/* Humidity */}
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                      <Droplet className="w-3.5 h-3.5 text-blue-500" />
+                      <Droplet className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                       <span>Humidity</span>
                     </div>
-                    <div className="text-lg font-bold text-slate-800">
+                    <div className="text-lg font-bold text-slate-800 whitespace-nowrap">
                       {weatherData.current.relativeHumidity}%
                     </div>
                     <div className="text-[10px] text-slate-400">Relative 2m</div>
@@ -400,10 +411,10 @@ export const LocationExplorerPage: React.FC = () => {
                   {/* Precipitation */}
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                      <CloudRain className="w-3.5 h-3.5 text-blue-600" />
+                      <CloudRain className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                       <span>Precipitation</span>
                     </div>
-                    <div className="text-lg font-bold text-slate-800">
+                    <div className="text-lg font-bold text-slate-800 whitespace-nowrap">
                       {weatherData.current.precipitation} mm
                     </div>
                     <div className="text-[10px] text-slate-400">Current hour</div>
@@ -412,19 +423,19 @@ export const LocationExplorerPage: React.FC = () => {
                   {/* Wind Speed */}
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                      <Wind className="w-3.5 h-3.5 text-teal-600" />
+                      <Wind className="w-3.5 h-3.5 text-teal-600 shrink-0" />
                       <span>Wind Speed</span>
                     </div>
-                    <div className="text-lg font-bold text-slate-800">
+                    <div className="text-lg font-bold text-slate-800 whitespace-nowrap">
                       {weatherData.current.windSpeed} km/h
                     </div>
                     <div className="text-[10px] text-slate-400">{weatherData.current.windDirection}° heading</div>
                   </div>
 
-                  {/* Observation Source */}
-                  <div className="space-y-0.5 border-l border-slate-200/80 pl-3">
-                    <span className="text-[10px] uppercase font-semibold text-slate-400 block">Telemetry</span>
-                    <span className="text-xs font-semibold text-slate-800 block truncate">Open-Meteo API</span>
+                  {/* Data Source & Provenance */}
+                  <div className="space-y-0.5 border-l border-slate-200/80 pl-3 min-w-0">
+                    <span className="text-[10px] uppercase font-semibold text-slate-400 block">Source Model</span>
+                    <span className="text-xs font-semibold text-slate-800 block truncate" title="Open-Meteo NWP">Open-Meteo NWP</span>
                     <span className="text-[10px] text-slate-500 block truncate">
                       {formatTime(weatherData.current.time)}
                     </span>
@@ -432,13 +443,13 @@ export const LocationExplorerPage: React.FC = () => {
                 </div>
               </Card>
 
-              {/* 5-Day Short-Term Forecast Strip */}
+              {/* 5-Day Numerical Model Forecast Strip */}
               {weatherData.daily && weatherData.daily.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs px-1">
-                    <span className="font-semibold text-slate-700">5-Day Numerical Model Forecast</span>
+                    <span className="font-semibold text-slate-700">5-Day Numerical Model Forecast (Future Output)</span>
                     <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                      <StatusPill status="forecast" showIcon={false} />
+                      <StatusPill status="forecast" customLabel="Numerical Forecast" showIcon={false} />
                     </span>
                   </div>
 
@@ -484,96 +495,152 @@ export const LocationExplorerPage: React.FC = () => {
             </h2>
             <p className="text-xs text-slate-500">
               {selectedLocation
-                ? `Active location: ${selectedLocation.name}. Live weather connected; other sector models arrive in subsequent phases.`
+                ? `Active location: ${selectedLocation.name}. Real weather, air quality, solar, and agrometeorology models active; remaining domains show explicit pending states.`
                 : 'Awaiting location selection to load telemetry.'}
             </p>
           </div>
           <span className="text-[11px] text-slate-500">
-            {selectedLocation ? 'Weather Connected · 4 Sectors Awaiting' : '0 of 5 Connected'}
+            {selectedLocation ? '4 Sector Models Active · 5 Domains Awaiting' : '0 of 9 Domains Active'}
           </span>
         </div>
 
         {/* Responsive grid preventing cramped layouts */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-          {/* 1. Climate & Weather (LIVE when weatherData is loaded) */}
+          {/* 1. Climate & Weather (Open-Meteo Current Condition) */}
           <MetricCard
             label="Climate & Weather"
             subtext={weatherData ? weatherData.current.weatherText : 'Surface Air Temp'}
             value={weatherData ? weatherData.current.temperature.toFixed(1) : null}
             unit="°C"
-            status={weatherData ? 'measured' : selectedLocation ? 'awaiting_geocoding' : 'unavailable'}
-            statusLabel={weatherData ? 'Measured (Open-Meteo)' : undefined}
-            source={weatherData ? 'Open-Meteo API' : undefined}
+            status={weatherData ? 'provider_reported_current' : selectedLocation ? 'awaiting_geocoding' : 'unavailable'}
+            statusLabel={weatherData ? 'Reported Condition' : undefined}
+            source={weatherData ? 'Open-Meteo Weather API' : undefined}
             timestamp={weatherData ? formatTime(weatherData.current.time) : undefined}
             icon={<CloudSun className="w-4 h-4 text-brand-600" />}
-            description="Direct hourly surface air temperature telemetry and prevailing atmospheric conditions"
+            geographicScope="Point Coordinate (0.1° NWP Grid)"
+            description="Hourly surface air temperature analyzed via blended numerical weather prediction models (ECMWF/ICON/GFS)"
           />
 
-          {/* 2. Water Resources (Strictly honest unavailable placeholder) */}
+          {/* 2. Environment & Air Quality (Copernicus CAMS via Open-Meteo) */}
           <MetricCard
-            label="Water Resources"
-            subtext="Baseline Water Stress"
-            value={null}
-            unit="ratio"
-            status="unavailable"
-            statusLabel="Awaiting Phase 3"
-            source="WRI Aqueduct 4.0"
-            icon={<Droplets className="w-4 h-4 text-blue-500" />}
-            description="Ratio of total annual water withdrawals to renewable surface and aquifer reserves"
+            label="Environment & Air Quality"
+            subtext={airQualityData?.current.usAqi !== undefined ? `US AQI: ${airQualityData.current.usAqi}` : 'Fine Particulate Matter'}
+            value={airQualityData?.current.pm2_5 !== undefined ? airQualityData.current.pm2_5.toFixed(1) : null}
+            unit="µg/m³ PM2.5"
+            status={airQualityData ? 'model_analysis' : selectedLocation ? 'awaiting_geocoding' : 'unavailable'}
+            statusLabel={airQualityData ? 'Model Analysis' : undefined}
+            source={airQualityData ? 'Copernicus CAMS' : undefined}
+            timestamp={airQualityData ? formatTime(airQualityData.current.time) : undefined}
+            icon={<Leaf className="w-4 h-4 text-teal-600" />}
+            geographicScope="Copernicus CAMS (0.1° Grid)"
+            description="Atmospheric PM2.5 particulate concentration modeled via Copernicus Atmosphere Monitoring Service (CAMS)"
           />
 
-          {/* 3. Energy Potential (Strictly honest unavailable placeholder) */}
+          {/* 3. Energy Potential (Direct Solar Irradiance via Open-Meteo) */}
           <MetricCard
             label="Energy Potential"
-            subtext="Solar PV Yield (PVOUT)"
-            value={null}
-            unit="kWh/kWp"
-            status="unavailable"
-            statusLabel="Awaiting Phase 3"
-            source="Global Solar Atlas"
+            subtext={weatherData?.current.directNormalIrradiance !== undefined ? 'Solar DNI Beam' : 'Solar Irradiance'}
+            value={weatherData?.current.directNormalIrradiance !== undefined ? weatherData.current.directNormalIrradiance.toFixed(0) : null}
+            unit="W/m²"
+            status={weatherData?.current.directNormalIrradiance !== undefined ? 'model_analysis' : selectedLocation ? 'awaiting_geocoding' : 'unavailable'}
+            statusLabel={weatherData?.current.directNormalIrradiance !== undefined ? 'Model Analysis' : undefined}
+            source={weatherData ? 'Open-Meteo Solar Model' : undefined}
+            timestamp={weatherData ? formatTime(weatherData.current.time) : undefined}
             icon={<Zap className="w-4 h-4 text-amber-500" />}
-            description="Expected annual long-term electricity generation per installed kW peak"
+            geographicScope="Point Coordinate (0.1° Grid)"
+            description="Direct Normal Irradiance (DNI) modeled from atmospheric radiative transfer equations"
           />
 
-          {/* 4. Agriculture (Strictly honest unavailable placeholder) */}
+          {/* 4. Agriculture & Soil (FAO-56 Evapotranspiration via Open-Meteo) */}
           <MetricCard
-            label="Agriculture"
-            subtext="Soil Organic Carbon"
-            value={null}
-            unit="g/kg"
-            status="unavailable"
-            statusLabel="Awaiting Phase 5"
-            source="ISRIC SoilGrids"
+            label="Agriculture & Soil"
+            subtext={weatherData?.daily[0]?.et0Evapotranspiration !== undefined ? 'FAO-56 ET₀ Water Demand' : 'Crop Evapotranspiration'}
+            value={weatherData?.daily[0]?.et0Evapotranspiration !== undefined ? weatherData.daily[0].et0Evapotranspiration.toFixed(1) : null}
+            unit="mm/day"
+            status={weatherData?.daily[0]?.et0Evapotranspiration !== undefined ? 'model_analysis' : selectedLocation ? 'awaiting_geocoding' : 'unavailable'}
+            statusLabel={weatherData?.daily[0]?.et0Evapotranspiration !== undefined ? 'Model Analysis' : undefined}
+            source={weatherData ? 'FAO-56 Penman-Monteith' : undefined}
+            timestamp={weatherData?.daily[0]?.date}
             icon={<Sprout className="w-4 h-4 text-emerald-500" />}
-            description="Topsoil organic matter content governing crop viability and soil moisture retention"
+            geographicScope="Local Terrain (FAO-56)"
+            description="Reference evapotranspiration (ET₀) for agricultural crop water balance estimation"
           />
 
-          {/* 5. Environment (Strictly honest unavailable placeholder) */}
+          {/* 5. Water Resources (Copernicus GloFAS Daily River Discharge) */}
           <MetricCard
-            label="Environment"
-            subtext="Air Quality (PM2.5)"
-            value={null}
-            unit="µg/m³"
-            status="unavailable"
-            statusLabel="Awaiting Phase 5"
-            source="Copernicus CAMS"
-            icon={<Leaf className="w-4 h-4 text-teal-500" />}
-            description="Ambient fine particulate matter concentration <= 2.5 micrometers"
+            label="Water Resources"
+            subtext={hydrologyData?.riverDischarge !== undefined ? 'GloFAS River Discharge' : 'River Discharge'}
+            value={hydrologyData?.riverDischarge !== undefined ? hydrologyData.riverDischarge.toFixed(2) : null}
+            unit="m³/s"
+            status={hydrologyData?.riverDischarge !== undefined ? 'model_analysis' : selectedLocation ? 'awaiting_geocoding' : 'unavailable'}
+            statusLabel={hydrologyData?.riverDischarge !== undefined ? 'Model Analysis' : undefined}
+            source="Copernicus GloFAS via Open-Meteo"
+            icon={<Droplets className="w-4 h-4 text-blue-500" />}
+            geographicScope="Sub-Basin River Grid (0.05°)"
+            description="Daily river channel discharge modeled by the Copernicus Global Flood Awareness System (GloFAS)"
           />
         </div>
       </div>
+
+      {/* Expanded Domain Intelligence Metadata Overview */}
+      {selectedLocation && (
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-brand-600" />
+              <span>Full Domain Intelligence Provenance</span>
+            </h2>
+            <span className="text-xs text-slate-500">AtlasIQ 9-Domain Baseline</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {domainIntelligence.map((domain) => (
+              <Card key={domain.domainId} className="space-y-2.5 flex flex-col justify-between">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900">{domain.domainTitle}</span>
+                    <Badge
+                      variant={domain.status === 'available' ? 'emerald' : domain.status === 'partial' ? 'teal' : 'default'}
+                      size="sm"
+                    >
+                      {domain.status === 'available' ? 'Active' : domain.status === 'partial' ? 'Partial' : 'Pending API'}
+                    </Badge>
+                  </div>
+                  <ul className="text-xs space-y-1 divide-y divide-slate-100">
+                    {domain.metrics.slice(0, 3).map((m) => (
+                      <li key={m.id} className="pt-1 flex items-center justify-between">
+                        <span className="text-slate-600 truncate mr-2" title={m.name}>{m.name}</span>
+                        {m.value !== null ? (
+                          <span className="font-semibold text-slate-900 shrink-0 font-mono text-[11px]">
+                            {m.value} {m.unit}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 shrink-0 text-[11px] italic">Unavailable</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-500 leading-snug">
+                  {domain.limitations}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Empty State when no location is selected */}
       {!selectedLocation && (
         <EmptyState
           title="Search for a location to explore its available intelligence."
-          description="Enter any city, region, or country (e.g., 'Hyderabad, India' or 'Valencia, Spain') to view its interactive map coordinates and live Open-Meteo weather data."
+          description="Enter any city, region, or country (e.g., 'Hyderabad, India' or 'Valencia, Spain') to view its interactive map coordinates, weather conditions, and air quality telemetry."
           actionText="Focus Search Bar"
           onAction={() => {
             const input = document.querySelector('input[aria-label="Location search"]') as HTMLInputElement;
             input?.focus();
           }}
-          promptNote="Interactive Leaflet mapping & Open-Meteo weather integrations are active."
+          promptNote="Interactive Leaflet mapping, Nominatim geocoding, and Open-Meteo weather/air quality models are active."
         />
       )}
 
@@ -582,9 +649,9 @@ export const LocationExplorerPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-2">
           <div className="flex items-center gap-2 font-semibold text-slate-800">
             <Calendar className="w-4 h-4 text-brand-600" />
-            <span>Reporting Periods & Source Governance</span>
+            <span>Data Provenance & Scientific Methodology</span>
           </div>
-          <span className="text-[11px] text-slate-500 font-mono">Telemetry Standard ISO-19115</span>
+          <span className="text-[11px] text-slate-500 font-mono">Transparency Standard ISO-19115</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-slate-600">
           <div>
@@ -592,12 +659,12 @@ export const LocationExplorerPage: React.FC = () => {
             OpenStreetMap Nominatim search engine providing reverse geocoding, boundary polygons, and geographic coordinates under ODbL.
           </div>
           <div>
-            <strong className="text-slate-800 block mb-1">Climatic & Weather Telemetry</strong>
-            Open-Meteo Weather API combining DWD ICON, NOAA GFS, and ECMWF IFS atmospheric models with hourly verification.
+            <strong className="text-slate-800 block mb-1">Weather & Atmosphere</strong>
+            Open-Meteo Numerical Weather Prediction (NWP) model outputs (ECMWF, DWD ICON, GFS) and Copernicus CAMS air quality models. Not unassimilated ground sensor networks.
           </div>
           <div>
-            <strong className="text-slate-800 block mb-1">Upcoming Sector Models</strong>
-            WRI Aqueduct 4.0 (water risk), Global Solar/Wind Atlas (renewables), and FAO WaPOR (crop suitability) scheduled for subsequent phases.
+            <strong className="text-slate-800 block mb-1">Pending Sector Models</strong>
+            WRI Aqueduct 4.0 (water risk), Global Solar Atlas (grid PV capacity), and ISRIC SoilGrids (soil carbon) remain unpopulated pending authenticated GIS raster access.
           </div>
         </div>
       </Card>

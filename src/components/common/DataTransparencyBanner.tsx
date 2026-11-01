@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card } from './Card';
-import { ShieldCheck, CheckCircle2, Calculator, Layers, AlertCircle } from 'lucide-react';
+import { ShieldCheck, CloudSun, Calendar, HelpCircle, Layers } from 'lucide-react';
 
 export const DataTransparencyBanner: React.FC<{ className?: string }> = ({ className = '' }) => {
   return (
@@ -11,12 +11,12 @@ export const DataTransparencyBanner: React.FC<{ className?: string }> = ({ class
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-slate-900">AtlasIQ Data Integrity & Transparency Framework</h4>
-            <p className="text-xs text-slate-500">Every indicator clearly states its verification tier and analytical origin.</p>
+            <h4 className="text-sm font-semibold text-slate-900">AtlasIQ Data Integrity & Provenance Framework</h4>
+            <p className="text-xs text-slate-500">Every indicator clearly states its origin, scientific classification, and verification tier.</p>
           </div>
         </div>
         <span className="text-[11px] font-medium text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200 shadow-2xs">
-          Scientific Standard
+          Transparency Standard
         </span>
       </div>
 
@@ -25,11 +25,11 @@ export const DataTransparencyBanner: React.FC<{ className?: string }> = ({ class
           <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
           <div>
             <div className="font-semibold text-slate-900 flex items-center gap-1">
-              Measured Data
-              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              Provider Current Condition
+              <CloudSun className="w-3 h-3 text-emerald-600" />
             </div>
             <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
-              Direct telemetry from verified ground stations, sensors, and remote sensing satellites.
+              Atmospheric state analyzed by regional numerical weather prediction (NWP) models via Open-Meteo.
             </p>
           </div>
         </div>
@@ -38,24 +38,24 @@ export const DataTransparencyBanner: React.FC<{ className?: string }> = ({ class
           <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-1.5" />
           <div>
             <div className="font-semibold text-slate-900 flex items-center gap-1">
-              Statistical Estimate
-              <Calculator className="w-3 h-3 text-blue-600" />
+              Model Analysis
+              <Layers className="w-3 h-3 text-blue-600" />
             </div>
             <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
-              Algorithmic spatial interpolation, regional regressions, and demographic census estimates.
+              Atmospheric dispersion reanalysis from Copernicus CAMS and FAO Penman-Monteith agrometeorology.
             </p>
           </div>
         </div>
 
         <div className="flex items-start gap-2.5 p-2 rounded-lg bg-white/70 border border-slate-100">
-          <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0 mt-1.5" />
+          <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0 mt-1.5" />
           <div>
             <div className="font-semibold text-slate-900 flex items-center gap-1">
-              Simulation / Model
-              <Layers className="w-3 h-3 text-purple-600" />
+              Numerical Forecast
+              <Calendar className="w-3 h-3 text-sky-600" />
             </div>
             <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
-              Prospective climatic projections, hydrological balance equations, and economic scenarios.
+              Short-term forward projection computed through ensemble meteorological models.
             </p>
           </div>
         </div>
@@ -64,11 +64,11 @@ export const DataTransparencyBanner: React.FC<{ className?: string }> = ({ class
           <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0 mt-1.5" />
           <div>
             <div className="font-semibold text-slate-900 flex items-center gap-1">
-              Awaiting Location
-              <AlertCircle className="w-3 h-3 text-slate-500" />
+              Unavailable / Pending
+              <HelpCircle className="w-3 h-3 text-slate-500" />
             </div>
             <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
-              Unpopulated metric awaiting user search or unindexed regional telemetry.
+              Explicitly unpopulated to prevent fabricated or zero-default values when data APIs are absent.
             </p>
           </div>
         </div>
